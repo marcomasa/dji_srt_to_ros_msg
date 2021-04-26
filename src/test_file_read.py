@@ -49,6 +49,7 @@ with open("/media/marco/Shared Memory/Documents/UNI/Promotion/Videos_Park_Waste/
 
         # time frame    
         elif(cur_index == i_timewindow):
+            None
 
         # telemetry data
         elif(cur_index == i_telemetry):
