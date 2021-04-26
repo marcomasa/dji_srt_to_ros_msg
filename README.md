@@ -19,8 +19,13 @@ You can use the [movie publisher](https://github.com/peci1/movie_publisher) pack
 ### Dependencies
 
 Install the [rosbash_params](https://github.com/peci1/rosbash_params) package
+
 ``` sudo apt install ros-melodic-rosbash-params ```
 
 Also, install the dependencies required from the movie publisher package 
-(please refer to [movie publisher](https://github.com/peci1/movie_publisher) for specific dependencies)
+
 ``` sudo apt install ffmjpeg ```
+
+(please refer to [movie publisher](https://github.com/peci1/movie_publisher) for specific dependencies)
+
+
