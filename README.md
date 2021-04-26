@@ -28,4 +28,13 @@ Also, install the dependencies required from the movie publisher package
 
 (please refer to [movie publisher](https://github.com/peci1/movie_publisher) for specific dependencies)
 
+### Necessary Adjustments
+
+In line 313 of the [movie_publisher_node](https://github.com/peci1/movie_publisher/blob/indigo-devel/nodes/movie_publisher_node) the image encoding needs to be changed from "bgr8" to "rgb8" to work correctly (atleast for Mavic Mini .mp4 videos):
+
+``` msg = self.bridge.cv2_to_imgmsg(frame, "bgr8") ```
+
+Change to:
+
+``` msg = self.bridge.cv2_to_imgmsg(frame, "rgb8") ```
 
