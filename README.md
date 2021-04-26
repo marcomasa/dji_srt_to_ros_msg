@@ -15,3 +15,12 @@ As the telemetry belongs to a video file and is pre-recorded, it is advised to r
 ## Video conversion
 
 You can use the [movie publisher](https://github.com/peci1/movie_publisher) package to convert the video stream to a ROS message.
+
+### Dependencies
+
+Install the [rosbash_params](https://github.com/peci1/rosbash_params) package
+``` sudo apt install ros-melodic-rosbash-params ```
+
+Also, install the dependencies required from the movie publisher package 
+(please refer to [movie publisher](https://github.com/peci1/movie_publisher) for specific dependencies)
+``` sudo apt install ffmjpeg ```
