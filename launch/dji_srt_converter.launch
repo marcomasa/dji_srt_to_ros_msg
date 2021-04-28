@@ -1,0 +1,26 @@
+
+<launch>
+    <arg name="srt_file" default="/media/marco/Shared Memory/Documents/UNI/Promotion/Videos_Park_Waste/DJI_0115.srt"/>
+
+    <arg name="fps" default="30" />
+    <arg name="frame_id" default="dji_gps" />
+    <arg name="immediate" default="false" />
+    <arg name="interpolate" default="false" />
+    <arg name="playback_rate" default="" />
+    <arg name="fake_time_start" default="0.0" />
+    <arg name="verbose" default="false" />
+    <arg name="publisher_queue_size" default="10" unless="$(arg immediate)" />
+    <arg name="publisher_queue_size" default="1000" if="$(arg immediate)" />
+
+    <node name="dji_srt_to_ros_msg" pkg="dji_srt_to_ros_msg" type="srt_conversion" output="screen">
+        <param name="srt_file" value="$(arg srt_file)" />
+        <param name="fps" value="$(arg fps)" />
+        <param name="frame_id" value="$(arg frame_id)" />
+        <param name="immediate" value="$(arg immediate)" />
+        <param name="interpolate" value="$(arg interpolate)" />
+        <param name="playback_rate" value="$(arg playback_rate)" />
+        <param name="fake_time_start" value="$(arg fake_time_start)" />
+        <param name="verbose" value="$(arg verbose)" />
+        <param name="publisher_queue_size" value="$(arg publisher_queue_size)" />
+    </node>
+</launch>

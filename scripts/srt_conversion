@@ -1,0 +1,181 @@
+#!/usr/bin/env python
+
+
+from scipy import interpolate
+
+import rospy
+from sensor_msgs.msg import NavSatFix
+
+# every 4th line the pattern repeats
+# pattern is:
+# 1. sequence
+# 2. time window
+# 3. telemetry data
+i_seq, i_timewindow, i_telemetry = 1, 2, 3
+
+class GPS_RAW:
+    sequence_id = None
+    latitude = None
+    longitude = None
+    altitude = None
+    distance = None
+    height = None
+
+    def print_this(self):
+        print('GPS_RAW(' + self.sequence_id +
+              ' | lat=' + self.latitude +
+              ' | long=' + self.longitude +
+              ' | alt=' + self.altitude +
+              ' | dist=' + self.distance +
+              ' | height=' + self.height + ')')
+
+
+def interpolate_raw_gps_data(raw_gps_data_array, steps):
+    sequences, latitudes, longitudes, altitudes, heights = [], [], [], [], []
+    for elem in raw_gps_data_array:
+        sequences.append(elem.sequence_id)
+        latitudes.append(elem.latitude)
+        longitudes.append(elem.longitude)
+        altitudes.append(elem.altitude)
+        heights.append(elem.height)
+    
+    f_seq = interpolate.interp1d(sequences, sequences, kind = 'linear', fill_value="extrapolate")
+    f_lats = interpolate.interp1d(sequences, latitudes, kind = 'cubic', fill_value="extrapolate")
+    f_longs = interpolate.interp1d(sequences, longitudes, kind = 'cubic', fill_value="extrapolate")
+    f_alts = interpolate.interp1d(sequences, altitudes, kind = 'cubic', fill_value="extrapolate")
+    f_heights = interpolate.interp1d(sequences, heights, kind = 'cubic', fill_value="extrapolate")
+
+    index = 0
+
+    interpolated_data = []
+    while index <= (len(raw_gps_data_array) - 1):
+        new_gps_entry = GPS_RAW()
+        new_gps_entry.sequence_id = f_seq(index)
+        new_gps_entry.latitude = f_lats(index)
+        new_gps_entry.longitude = f_longs(index)
+        new_gps_entry.altitude = f_alts(index)
+        new_gps_entry.height = f_heights(index)
+        interpolated_data.append(new_gps_entry)
+        index += 1/steps
+    
+    return interpolated_data
+    
+
+def interpret_file(path_to_file):
+
+    all_gps_data = []
+    # open the provided file
+    with open(path_to_file, 'r') as reader:
+
+        # use the helper to recognize the pattern / line type
+        array_access_index = 1
+        tmp_gps_data = GPS_RAW()
+
+        # read line by line
+        for line in reader:
+            cur_index = array_access_index % 4
+
+            # sequence
+            if(cur_index == i_seq):
+                tmp_gps_data.sequence_id = int(line.rstrip('\n'))
+
+            # time frame
+            elif(cur_index == i_timewindow):
+                None
+
+            # telemetry data
+            elif(cur_index == i_telemetry):
+
+                # seperate the line elements by commas
+                currentline = line.split(',')
+
+                # these are the gps vals, some need more string separation
+                tmp_gps_data.latitude = float(currentline[4].split('(')[1])
+                tmp_gps_data.longitude = float(currentline[5])
+                tmp_gps_data.altitude = float(currentline[6].split(')')[0])
+                tmp_gps_data.distance = float(currentline[7].split('D')[1].split('m')[0])
+                tmp_gps_data.height = float(currentline[8].split('H')[1].split('m')[0])
+
+                # optionally print this
+                #tmp_gps_data.print_this()
+
+                # we can save the local gps data into the array
+                all_gps_data.append(tmp_gps_data)
+                tmp_gps_data = GPS_RAW()
+
+            # every fourth line is empty
+            else:
+                None
+
+            # increase the index
+            array_access_index += 1
+
+    return all_gps_data
+
+class SRT_CONVERTER:
+    def __init__(self):
+        try:
+            self.file = rospy.get_param("~srt_file")
+        except KeyError:
+            rospy.logerr(
+                "dji_srt_to_ros_msg_node: parameter ~srt_file is required")
+            raise
+
+        self.immediate = rospy.get_param("~immediate", False)
+        self.fake_time_start = rospy.Time.from_sec(rospy.get_param("~fake_time_start", 0.0))
+        self.frame_id = rospy.get_param("~frame_id", "")
+        self.queue_size = rospy.get_param("~publisher_queue_size", 10 if not self.immediate else 1000)
+
+
+        # drone only logs every second
+        # so we can try to linear interpolate between the measurements to match the frame rate
+        self.interpolate = rospy.get_param("~interpolate", False)
+        self.video_frame_rate = rospy.get_param("~video_frame_rate", 30.0)
+
+        if(not self.interpolate):
+            self.rate = rospy.Rate(1)
+        else:
+            self.rate = rospy.Rate(self.video_frame_rate)
+
+        # get the raw data from the file
+        self.raw_gps_data = interpret_file(self.file)
+
+        self.pub = rospy.Publisher("gps_data", NavSatFix, queue_size=self.queue_size)
+
+    def convert(self):
+        navsatval = NavSatFix()
+        navsatval.header.frame_id = self.frame_id
+
+        # interpolate if wanted
+        if(self.interpolate):
+            self.raw_gps_data = interpolate_raw_gps_data(self.raw_gps_data, self.video_frame_rate)
+
+        print("finished conversion for " + str(len(self.raw_gps_data)) + " gps values!")
+        print("starting to publish..")
+
+        n_pub = 0
+
+        for elem in self.raw_gps_data:
+            if rospy.is_shutdown():
+                break
+
+            print('publishing sequence ' + str(elem.sequence_id))
+
+            navsatval.header.stamp = rospy.Time.from_sec(self.fake_time_start.to_sec() + elem.sequence_id)
+            navsatval.latitude = elem.latitude
+            navsatval.longitude = elem.longitude
+            navsatval.altitude = elem.altitude + elem.height
+            self.pub.publish(navsatval)
+            n_pub += 1
+
+            if(not self.immediate):
+                self.rate.sleep()
+        
+        print("DONE! Published " + str(n_pub) + " gps values!")
+
+rospy.init_node("dji_srt_to_ros_msg_node")
+
+srt_converter = SRT_CONVERTER()
+srt_converter.convert()
+
+rospy.spin()
